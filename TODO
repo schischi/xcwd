@@ -1,0 +1,12 @@
+TODO
+====
+
+Features
+--------
+check the WM_CLIENT_MACHINE property
+multi-monitor ?
+
+Bugs
+----
+xcwd is unable to get the properties of a gtk window.
+
