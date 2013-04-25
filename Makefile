@@ -1,6 +1,6 @@
 CFILES=xcwd.c
 CC=gcc
-CFLAGS=-Wall -Werror -std=gnu89 #-DDEBUG -g
+CFLAGS=-Wall -Werror -std=gnu99
 LDFLAGS=-lX11
 EXE="xcwd"
 O=${CFILES:.c=.o}

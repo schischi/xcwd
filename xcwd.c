@@ -12,9 +12,14 @@
 #include <sys/stat.h>
 #include <X11/Xlib.h>
 
+#define DEBUG 1
+
 #define XA_STRING   (XInternAtom(dpy, "STRING", 0))
 #define XA_CARDINAL (XInternAtom(dpy, "CARDINAL", 0))
 #define XA_WM_STATE (XInternAtom(dpy, "WM_STATE", 0))
+
+#define LOG(fmt, ...) \
+    do { if (DEBUG) fprintf(stderr, fmt, __VA_ARGS__); } while (0)
 
 Display *dpy;
 
@@ -41,13 +46,11 @@ int ppidCmp(const void *p1, const void *p2)
 
 static Window focusedWindow()
 {
-    Window focuswin, root;
-    int focusrevert;
-    int format, status;
+    Atom type;
+    Window focuswin, root, *children;
+    int format, status, focusrevert;
     unsigned long nitems, after;
     unsigned char *data;
-    Atom type;
-    Window* children;
     unsigned int nchildren;
 
     dpy = XOpenDisplay (NULL);
@@ -57,19 +60,17 @@ static Window focusedWindow()
     root = XDefaultRootWindow(dpy);
 
     do {
-        status = XGetWindowProperty(dpy, focuswin, XA_WM_STATE, 0, 65536, 0,
+        status = XGetWindowProperty(dpy, focuswin, XA_WM_STATE, 0, 1024, 0,
                 XA_WM_STATE, &type, &format, &nitems, &after, &data);
-        if(status == Success && data) {
+        if (status == Success && data) {
             XFree(data);
-#ifdef DEBUG
-        fprintf(stderr, "Window ID = %lu\n", focuswin);
-#endif
+            LOG("Window ID = %lu\n", focuswin);
             return focuswin;
         }
+        else
+            return 0;
         XQueryTree(dpy, focuswin, &root, &focuswin, &children, &nchildren);
-#ifdef DEBUG
-        fprintf(stderr, "Current window do not have WM_STATE, getting parent\n");
-#endif
+        LOG("%s", "Current window does not have WM_STATE, getting parent\n");
     } while(focuswin != root);
 
     return 0;
@@ -84,20 +85,15 @@ static long windowPid(Window focuswin)
     unsigned long nitems, after;
     unsigned char *data;
 
-    status = XGetWindowProperty(dpy, focuswin, nameAtom, 0, 65536, 0,
+    status = XGetWindowProperty(dpy, focuswin, nameAtom, 0, 1024, 0,
             XA_CARDINAL, &type, &format, &nitems, &after, &data);
-    if(status == Success) {
-        if (data) {
-            pid = *((long*)data);
-            XFree(data);
-        }
+    if (status == Success && data) {
+        pid = *((long*)data);
+        XFree(data);
+        LOG("_NET_WM_PID = %lu\n", pid);
     }
-#ifdef DEBUG
-    if(pid == -1)
-        fprintf(stderr, "_NET_WM_PID not found\n");
     else
-        fprintf(stderr, "_NET_WM_PID = %lu\n", pid);
-#endif
+        LOG("%s", "_NET_WM_PID not found\n");
     return pid;
 }
 
@@ -114,27 +110,20 @@ static char* windowStrings(Window focuswin, size_t *size, char* hint)
     if (XGetWindowProperty(dpy, focuswin, nameAtom, 0, 1024, 0, AnyPropertyType,
                 &type, &format, size, &after, &data) == Success) {
         if (data) {
-            if(type == XA_STRING) {
+            if (type == XA_STRING) {
                 ret = malloc(sizeof(char) * *size);
-#ifdef DEBUG
-                fprintf(stderr, "%s = ", hint);
-#endif
-                for(i = 0; i < *size; ++i) {
-#ifdef DEBUG
-                    fprintf(stderr, "%c", data[i] == 0 ? ' ' : data[i]);
-#endif
+                LOG("%s = ", hint);
+                for (i = 0; i < *size; ++i) {
+                    LOG("%c", data[i] == 0 ? ' ' : data[i]);
                     ret[i] = data[i];
                 }
-#ifdef DEBUG
-                    fprintf(stderr, "\n");
-#endif
+                fprintf(stderr, "\n");
+                LOG("%s", "\n");
             }
             XFree(data);
         }
-#ifdef DEBUG
         else
-            fprintf(stderr, "%s not found\n", hint);
-#endif
+            LOG("%s not found\n", hint);
     }
     return ret;
 }
@@ -155,9 +144,7 @@ static processes_t getProcesses(void)
     p = malloc(sizeof(struct processes_s));
     p->ps = malloc(globbuf.gl_pathc * sizeof(struct proc_s));
 
-#ifdef DEBUG
-        fprintf(stderr, "Found %ld processes\n", globbuf.gl_pathc);
-#endif
+    LOG("Found %ld processes\n", globbuf.gl_pathc);
     for (i = j = 0; i < globbuf.gl_pathc; i++) {
         char name[32];
         FILE *tn;
@@ -170,10 +157,8 @@ static processes_t getProcesses(void)
             continue;
         fscanf(tn, "%ld (%32[^)] %*3c %ld", &p->ps[j].pid, p->ps[j].name,
                 &p->ps[j].ppid);
-#ifdef DEBUG
-        fprintf(stderr, "\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[j].name,
-                p->ps[j].pid, p->ps[j].ppid);
-#endif
+        LOG("\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[j].name, p->ps[j].pid,
+                p->ps[j].ppid);
         fclose(tn);
         j++;
     }
@@ -191,7 +176,7 @@ static long lastChild(processes_t p, long pid)
         res = (struct proc_s *)bsearch(&key, p->ps, p->n,
                 sizeof(struct proc_s), ppidCmp);
         pid = res ? res->pid : -1;
-    }while(pid != -1);
+    } while(pid != -1);
     return key.ppid;
 }
 
@@ -199,11 +184,12 @@ static void readPath(long pid)
 {
     char buf[255];
     char path[64];
+    ssize_t len;
+
     snprintf(path, sizeof(path), "/proc/%ld/cwd", pid);
-#ifdef DEBUG
-    fprintf(stderr, "Read %s\n", path);
-#endif
-    readlink(path, buf, 255);
+    LOG("Read %s\n", path);
+    if ((len = readlink(path, buf, 255)) != -1)
+        buf[len] = '\0';
     fprintf(stdout, "%s\n", buf);
 }
 
@@ -212,14 +198,14 @@ int main(int argc, const char *argv[])
     processes_t p;
     long pid;
     Window w = focusedWindow();
-    if(w == 0) {
+    if (w == 0) {
         fprintf(stdout, "%s\n", getenv("HOME"));
         return EXIT_FAILURE;
     }
 
     pid = windowPid(w);
     p = getProcesses();
-    if(pid != -1) { // WM_NET_PID
+    if (pid != -1) {
         qsort(p->ps, p->n, sizeof(struct proc_s), ppidCmp);
     }
     else {
@@ -230,32 +216,26 @@ int main(int argc, const char *argv[])
         qsort(p->ps, p->n, sizeof(struct proc_s), nameCmp);
         strings = windowStrings(w, &size, "WM_CLASS");
         for(i = 0; i < size; i += strlen(strings + i) + 1) {
-#ifdef DEBUG
-            fprintf(stderr, "pidof %s\n", strings + i);
-#endif
+            LOG("pidof %s\n", strings + i);
             strcpy(key.name, strings + i);
             res = (struct proc_s *)bsearch(&key, p->ps, p->n,
-                sizeof(struct proc_s), nameCmp);
+                    sizeof(struct proc_s), nameCmp);
             if(res)
                 break;
         }
-        if(res) {
+        if (res) {
             pid = res->pid;
-#ifdef DEBUG
-            fprintf(stderr, "Found %s (%ld)\n", res->name, res->pid);
-#endif
+            LOG("Found %s (%ld)\n", res->name, res->pid);
         }
-        if(size != 0)
+        if (size != 0)
             free(strings);
     }
-    if(pid != -1) {
+    if (pid != -1) {
         pid = lastChild(p, pid);
         readPath(pid);
     }
     else {
-#ifdef DEBUG
-        fprintf(stderr, "getenv $HOME...\n");
-#endif
+        LOG("%s", "getenv $HOME...\n");
         fprintf(stdout, "%s\n", getenv("HOME"));
     }
     freeProcesses(p);
