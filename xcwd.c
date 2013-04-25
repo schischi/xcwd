@@ -12,7 +12,9 @@
 #include <sys/stat.h>
 #include <X11/Xlib.h>
 
-#define XA_STRING (XInternAtom(dpy, "STRING", 0))
+#define XA_STRING   (XInternAtom(dpy, "STRING", 0))
+#define XA_CARDINAL (XInternAtom(dpy, "CARDINAL", 0))
+#define XA_WM_STATE (XInternAtom(dpy, "WM_STATE", 0))
 
 Display *dpy;
 
@@ -39,31 +41,52 @@ int ppidCmp(const void *p1, const void *p2)
 
 static Window focusedWindow()
 {
-    Window focuswin;
+    Window focuswin, root;
     int focusrevert;
+    int format, status;
+    unsigned long nitems, after;
+    unsigned char *data;
+    Atom type;
+    Window* children;
+    unsigned int nchildren;
 
     dpy = XOpenDisplay (NULL);
     if (!dpy)
         exit (1);
     XGetInputFocus (dpy, &focuswin, &focusrevert);
+    root = XDefaultRootWindow(dpy);
+
+    do {
+        status = XGetWindowProperty(dpy, focuswin, XA_WM_STATE, 0, 65536, 0,
+                XA_WM_STATE, &type, &format, &nitems, &after, &data);
+        if(status == Success && data) {
+            XFree(data);
 #ifdef DEBUG
-    fprintf(stderr, "Window ID = %lu\n", focuswin);
+        fprintf(stderr, "Window ID = %lu\n", focuswin);
 #endif
-    return focuswin;
+            return focuswin;
+        }
+        XQueryTree(dpy, focuswin, &root, &focuswin, &children, &nchildren);
+#ifdef DEBUG
+        fprintf(stderr, "Current window do not have WM_STATE, getting parent\n");
+#endif
+    } while(focuswin != root);
+
+    return 0;
 }
 
 static long windowPid(Window focuswin)
 {
     Atom nameAtom = XInternAtom(dpy, "_NET_WM_PID", 1);
-    Atom cardinalAtom = XInternAtom(dpy, "CARDINAL", 0);
     Atom type;
-    int format;
+    int format, status;
     long pid = -1;
     unsigned long nitems, after;
-    unsigned char *data = 0;
+    unsigned char *data;
 
-    if (XGetWindowProperty(dpy, focuswin, nameAtom, 0, 1024, 0, cardinalAtom,
-                &type, &format, &nitems, &after, &data) == Success) {
+    status = XGetWindowProperty(dpy, focuswin, nameAtom, 0, 65536, 0,
+            XA_CARDINAL, &type, &format, &nitems, &after, &data);
+    if(status == Success) {
         if (data) {
             pid = *((long*)data);
             XFree(data);
@@ -187,8 +210,12 @@ static void readPath(long pid)
 int main(int argc, const char *argv[])
 {
     processes_t p;
-    Window w = focusedWindow();
     long pid;
+    Window w = focusedWindow();
+    if(w == 0) {
+        fprintf(stdout, "%s\n", getenv("HOME"));
+        return EXIT_FAILURE;
+    }
 
     pid = windowPid(w);
     p = getProcesses();

@@ -8,5 +8,4 @@ multi-monitor ?
 
 Bugs
 ----
-xcwd is unable to get the properties of a gtk window.
 
