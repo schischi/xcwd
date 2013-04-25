@@ -12,7 +12,7 @@
 #include <sys/stat.h>
 #include <X11/Xlib.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define XA_STRING   (XInternAtom(dpy, "STRING", 0))
 #define XA_CARDINAL (XInternAtom(dpy, "CARDINAL", 0))
