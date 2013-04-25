@@ -7,11 +7,11 @@ O=${CFILES:.c=.o}
 prefix=/usr/
 
 ${EXE}: clean ${O}
-	${CC} ${CFLAGS} ${LDFLAGS} -o $@ ${O}
+	${CC} -o $@ ${O} ${CFLAGS} ${LDFLAGS} 
 
 .SUFFIXES: .c .o
 .c.o:
-	${CC} ${CFLAGS} -c $<
+	${CC} -c $< ${CFLAGS}
 
 clean:
 	rm -vf *.o
