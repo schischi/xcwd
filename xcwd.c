@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <glob.h>
 #include <sys/stat.h>
@@ -102,7 +103,7 @@ static char* windowStrings(Window focuswin, size_t *size, char* hint)
     Atom nameAtom = XInternAtom(dpy, hint, 1);
     Atom type;
     int format;
-    int i;
+    unsigned int i;
     unsigned long after;
     unsigned char *data = 0;
     char *ret = NULL;
@@ -195,6 +196,9 @@ static void readPath(long pid)
 
 int main(int argc, const char *argv[])
 {
+    (void)argc;
+    (void)argv;
+
     processes_t p;
     long pid;
     Window w = focusedWindow();
@@ -211,8 +215,9 @@ int main(int argc, const char *argv[])
     else {
         size_t size;
         char* strings;
-        int i;
+        unsigned int i;
         struct proc_s *res = NULL, key;
+
         qsort(p->ps, p->n, sizeof(struct proc_s), nameCmp);
         strings = windowStrings(w, &size, "WM_CLASS");
         for(i = 0; i < size; i += strlen(strings + i) + 1) {

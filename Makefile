@@ -1,13 +1,13 @@
 CFILES=xcwd.c
 CC=gcc
-CFLAGS=-Wall -Werror -std=gnu99
+CFLAGS=-Wall -Werror -Wextra -pedantic -std=gnu99 -O2
 LDFLAGS=-lX11
 EXE="xcwd"
 O=${CFILES:.c=.o}
 prefix=/usr/
 
 ${EXE}: clean ${O}
-	${CC} -o $@ ${O} ${CFLAGS} ${LDFLAGS} 
+	${CC} -o $@ ${O} ${CFLAGS} ${LDFLAGS}
 
 .SUFFIXES: .c .o
 .c.o:
