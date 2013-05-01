@@ -191,15 +191,21 @@ static int readPath(long pid)
 static void cwdOfDeepestChild(processes_t p, long pid)
 {
     int i;
-    struct proc_s key, *res = NULL, *lastRes;
+    struct proc_s key = {.ppid = pid}, *res = NULL, *lastRes = NULL;
 
     do {
-        lastRes = res;
-        key.ppid = pid;
+        if(res) {
+            lastRes = res;
+            key.ppid = res->pid;
+        }
         res = (struct proc_s *)bsearch(&key, p->ps, p->n,
                 sizeof(struct proc_s), ppidCmp);
-        pid = res ? res->pid : -1;
-    } while(pid != -1);
+    } while(res);
+
+    if(!lastRes) {
+        readPath(pid);
+        return;
+    }
 
     for(i = 0; lastRes != p->ps && (lastRes - i)->ppid == lastRes->ppid; ++i)
         if(readPath((lastRes - i)->pid))
