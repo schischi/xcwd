@@ -63,10 +63,12 @@ static Window focusedWindow()
     do {
         status = XGetWindowProperty(dpy, focuswin, XA_WM_STATE, 0, 1024, 0,
                 XA_WM_STATE, &type, &format, &nitems, &after, &data);
-        if (status == Success && data) {
-            XFree(data);
-            LOG("Window ID = %lu\n", focuswin);
-            return focuswin;
+        if (status == Success) {
+            if (data) {
+                XFree(data);
+                LOG("Window ID = %lu\n", focuswin);
+                return focuswin;
+            }
         }
         else
             return 0;
@@ -168,30 +170,43 @@ static processes_t getProcesses(void)
     return p;
 }
 
-static long lastChild(processes_t p, long pid)
-{
-    struct proc_s key, *res;
-
-    do {
-        key.ppid = pid;
-        res = (struct proc_s *)bsearch(&key, p->ps, p->n,
-                sizeof(struct proc_s), ppidCmp);
-        pid = res ? res->pid : -1;
-    } while(pid != -1);
-    return key.ppid;
-}
-
-static void readPath(long pid)
+static int readPath(long pid)
 {
     char buf[255];
     char path[64];
     ssize_t len;
 
     snprintf(path, sizeof(path), "/proc/%ld/cwd", pid);
-    LOG("Read %s\n", path);
     if ((len = readlink(path, buf, 255)) != -1)
         buf[len] = '\0';
+    if(len <= 0) {
+        LOG("Error readlink %s\n", path);
+        return 0;
+    }
+    LOG("Read %s\n", path);
     fprintf(stdout, "%s\n", buf);
+    return 1;
+}
+
+static void cwdOfDeepestChild(processes_t p, long pid)
+{
+    int i;
+    struct proc_s key, *res = NULL, *lastRes;
+
+    do {
+        lastRes = res;
+        key.ppid = pid;
+        res = (struct proc_s *)bsearch(&key, p->ps, p->n,
+                sizeof(struct proc_s), ppidCmp);
+        pid = res ? res->pid : -1;
+    } while(pid != -1);
+
+    for(i = 0; lastRes != p->ps && (lastRes - i)->ppid == lastRes->ppid; ++i)
+        if(readPath((lastRes - i)->pid))
+            return;
+    for(i = 1; lastRes != p->ps + p->n && (lastRes + i)->ppid == lastRes->ppid; ++i)
+        if(readPath((lastRes + i)->pid))
+            return;
 }
 
 int main(int argc, const char *argv[])
@@ -203,6 +218,7 @@ int main(int argc, const char *argv[])
     long pid;
     Window w = focusedWindow();
     if (w == 0) {
+        LOG("%s", "getenv $HOME...\n");
         fprintf(stdout, "%s\n", getenv("HOME"));
         return EXIT_FAILURE;
     }
@@ -235,10 +251,8 @@ int main(int argc, const char *argv[])
         if (size != 0)
             free(strings);
     }
-    if (pid != -1) {
-        pid = lastChild(p, pid);
-        readPath(pid);
-    }
+    if (pid != -1)
+        cwdOfDeepestChild(p, pid);
     else {
         LOG("%s", "getenv $HOME...\n");
         fprintf(stdout, "%s\n", getenv("HOME"));
