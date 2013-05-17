@@ -100,7 +100,7 @@ static long windowPid(Window focuswin)
     return pid;
 }
 
-static char* windowStrings(Window focuswin, size_t *size, char* hint)
+static char* windowStrings(Window focuswin, long unsigned int *size, char* hint)
 {
     Atom nameAtom = XInternAtom(dpy, hint, 1);
     Atom type;
@@ -147,7 +147,7 @@ static processes_t getProcesses(void)
     p = malloc(sizeof(struct processes_s));
     p->ps = malloc(globbuf.gl_pathc * sizeof(struct proc_s));
 
-    LOG("Found %ld processes\n", globbuf.gl_pathc);
+    LOG("Found %zu processes\n", globbuf.gl_pathc);
     for (i = j = 0; i < globbuf.gl_pathc; i++) {
         char name[32];
         FILE *tn;
@@ -235,9 +235,9 @@ int main(int argc, const char *argv[])
         qsort(p->ps, p->n, sizeof(struct proc_s), ppidCmp);
     }
     else {
-        size_t size;
-        char* strings;
+        long unsigned int size;
         unsigned int i;
+        char* strings;
         struct proc_s *res = NULL, key;
 
         qsort(p->ps, p->n, sizeof(struct proc_s), nameCmp);
