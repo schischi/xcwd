@@ -158,8 +158,9 @@ static processes_t getProcesses(void)
         tn = fopen(name, "r");
         if (tn == NULL)
             continue;
-        fscanf(tn, "%ld (%32[^)] %*3c %ld", &p->ps[j].pid, p->ps[j].name,
-                &p->ps[j].ppid);
+        if(fscanf(tn, "%ld (%32[^)] %*3c %ld", &p->ps[j].pid,
+                p->ps[j].name, &p->ps[j].ppid) != 3)
+            return NULL;
         LOG("\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[j].name, p->ps[j].pid,
                 p->ps[j].ppid);
         fclose(tn);
@@ -215,6 +216,13 @@ static void cwdOfDeepestChild(processes_t p, long pid)
             return;
 }
 
+int getHomeDirectory()
+{
+    LOG("%s", "getenv $HOME...\n");
+    fprintf(stdout, "%s\n", getenv("HOME"));
+    return EXIT_FAILURE;
+}
+
 int main(int argc, const char *argv[])
 {
     (void)argc;
@@ -223,14 +231,13 @@ int main(int argc, const char *argv[])
     processes_t p;
     long pid;
     Window w = focusedWindow();
-    if (w == 0) {
-        LOG("%s", "getenv $HOME...\n");
-        fprintf(stdout, "%s\n", getenv("HOME"));
-        return EXIT_FAILURE;
-    }
+    if (w == 0)
+        return getHomeDirectory();
 
     pid = windowPid(w);
     p = getProcesses();
+    if(p == NULL)
+        return getHomeDirectory();
     if (pid != -1) {
         qsort(p->ps, p->n, sizeof(struct proc_s), ppidCmp);
     }
