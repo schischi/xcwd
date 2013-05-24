@@ -216,28 +216,37 @@ static void cwdOfDeepestChild(processes_t p, long pid)
             return;
 }
 
-int getHomeDirectory()
+int getHomeDirectory(const char* HOME)
 {
     LOG("%s", "getenv $HOME...\n");
-    fprintf(stdout, "%s\n", getenv("HOME"));
+    fprintf(stdout, "%s\n", HOME);
     return EXIT_FAILURE;
 }
 
 int main(int argc, const char *argv[])
 {
-    (void)argc;
-    (void)argv;
+    char* HOME = NULL;
+    if (argc == 2) {
+      // we were explicitly passed a fallback directory
+      HOME = malloc(strlen(argv[1]));
+      strcpy(HOME, argv[1]);
+    }
+    else {
+      // not passed a fallback directory, use environment home
+      HOME = malloc(strlen(getenv("HOME")));
+      strcpy(HOME, getenv("HOME"));
+    }
 
     processes_t p;
     long pid;
     Window w = focusedWindow();
     if (w == 0)
-        return getHomeDirectory();
+        return getHomeDirectory(HOME);
 
     pid = windowPid(w);
     p = getProcesses();
     if(p == NULL)
-        return getHomeDirectory();
+        return getHomeDirectory(HOME);
     if (pid != -1) {
         qsort(p->ps, p->n, sizeof(struct proc_s), ppidCmp);
     }
@@ -268,10 +277,10 @@ int main(int argc, const char *argv[])
         cwdOfDeepestChild(p, pid);
     else {
         LOG("%s", "getenv $HOME...\n");
-        fprintf(stdout, "%s\n", getenv("HOME"));
+        fprintf(stdout, "%s\n", HOME);
     }
     freeProcesses(p);
-
+    free((char*)HOME);
     return EXIT_SUCCESS;
 }
 
