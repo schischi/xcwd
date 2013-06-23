@@ -20,6 +20,11 @@ getting the working directory of the terminal emulator instead of the shell.
 Finally it prints the content of `/proc/pid/cwd` on the standard output.  If
 xcwd was unable to find the PID, it prints the content of the `HOME` variable.
 
+Disclaimer
+----------
+This script can't retrieve the working directory of a shell in tmux, screen
+or in an instance of urxvtc.
+
 Requirements
 ------------
 - Linux
