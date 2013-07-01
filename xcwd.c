@@ -120,7 +120,6 @@ static char* windowStrings(Window focuswin, long unsigned int *size, char* hint)
                     LOG("%c", data[i] == 0 ? ' ' : data[i]);
                     ret[i] = data[i];
                 }
-                fprintf(stderr, "\n");
                 LOG("%s", "\n");
             }
             XFree(data);
