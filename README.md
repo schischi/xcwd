@@ -35,4 +35,4 @@ Running xwcd
 Simply invoke the 'xcwd' command.
 
 You probably want to use it this way:
-    ``urxvt -cd `xcwd` ``
+    ``urxvt -cd "`xcwd`" ``
