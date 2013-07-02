@@ -192,14 +192,14 @@ static processes_t getProcesses(void)
     kp = malloc(len);
     error = sysctl(name, 4, kp, &len, NULL, 0);
     count = len / sizeof(*kp);
-    p->ps = malloc(sizeof(struct proc_s) * count);
+    p->ps = calloc(count, sizeof(struct proc_s));
     p->n = count;
 
     unsigned int i;
     for(i = 0; i < count; ++i) {
         struct kinfo_file *files, *kif;
         int cnt, j;
-        if(kp[i].ki_fd == NULL)
+        if(kp[i].ki_fd == NULL || kp[i].ki_pid == 0)
             continue;
         files = kinfo_getfile(kp[i].ki_pid, &cnt);
         for(j = 0; j < cnt; ++j) {
@@ -210,8 +210,8 @@ static processes_t getProcesses(void)
             p->ps[i].ppid = kp[i].ki_ppid;
             strncpy(p->ps[i].name, kp[i].ki_tdname, 32);
             strncpy(p->ps[i].cwd, kif->kf_path, MAXPATHLEN);
-            LOG("\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[j].name, p->ps[j].pid,
-                p->ps[j].ppid);
+            LOG("\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[i].name, p->ps[i].pid,
+                p->ps[i].ppid);
         }
 
     }
@@ -247,10 +247,11 @@ static int readPath(struct proc_s *proc)
     return 1;
 }
 
-static void cwdOfDeepestChild(processes_t p, long pid)
+static int cwdOfDeepestChild(processes_t p, long pid)
 {
     int i;
-    struct proc_s key = {.ppid = pid}, *res = NULL, *lastRes = NULL;
+    struct proc_s key = { .pid = pid, .ppid = pid},
+                  *res = NULL, *lastRes = NULL;
 
     do {
         if(res) {
@@ -262,16 +263,16 @@ static void cwdOfDeepestChild(processes_t p, long pid)
     } while(res);
 
     if(!lastRes) {
-        readPath(&key);
-        return;
+        return readPath(&key);
     }
 
     for(i = 0; lastRes != p->ps && (lastRes - i)->ppid == lastRes->ppid; ++i)
         if(readPath((lastRes - i)))
-            return;
+            return 1;
     for(i = 1; lastRes != p->ps + p->n && (lastRes + i)->ppid == lastRes->ppid; ++i)
         if(readPath((lastRes + i)))
-            return;
+            return 1;
+    return 0;
 }
 
 int getHomeDirectory()
@@ -322,9 +323,7 @@ int main(int argc, const char *argv[])
         if (size != 0)
             free(strings);
     }
-    if (pid != -1)
-        cwdOfDeepestChild(p, pid);
-    else {
+    if (pid == -1 || !cwdOfDeepestChild(p, pid)) {
         LOG("%s", "getenv $HOME...\n");
         fprintf(stdout, "%s\n", getenv("HOME"));
     }
