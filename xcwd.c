@@ -71,6 +71,8 @@ static Window focusedWindow()
         exit (1);
     XGetInputFocus (dpy, &focuswin, &focusrevert);
     root = XDefaultRootWindow(dpy);
+    if(root == focuswin)
+        return None;
 
     do {
         status = XGetWindowProperty(dpy, focuswin, XA_WM_STATE, 0, 1024, 0,
@@ -290,7 +292,7 @@ int main(int argc, const char *argv[])
     processes_t p;
     long pid;
     Window w = focusedWindow();
-    if (w == 0)
+    if (w == None)
         return getHomeDirectory();
 
     pid = windowPid(w);
