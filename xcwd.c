@@ -215,6 +215,7 @@ static processes_t getProcesses(void)
         }
 
     }
+    free(kp);
 #endif
     return p;
 }
