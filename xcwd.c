@@ -22,7 +22,7 @@
 # include <libutil.h>
 #endif
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define XA_STRING   (XInternAtom(dpy, "STRING", 0))
 #define XA_CARDINAL (XInternAtom(dpy, "CARDINAL", 0))
@@ -211,8 +211,8 @@ static processes_t getProcesses(void)
             p->ps[i].ppid = kp[i].ki_ppid;
             strncpy(p->ps[i].name, kp[i].ki_tdname, 32);
             strncpy(p->ps[i].cwd, kif->kf_path, MAXPATHLEN);
-            //fprintf(stderr, "%s (%ld - %ld) - %s\n",p->ps[i].name,  p->ps[i].pid,
-            //        p->ps[i].ppid, p->ps[i].cwd);
+            LOG("\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[j].name, p->ps[j].pid,
+                p->ps[j].ppid);
         }
 
     }
@@ -238,8 +238,10 @@ static int readPath(struct proc_s *proc)
     fprintf(stdout, "%s\n", buf);
 #endif
 #ifdef BSD
-    if(!strlen(proc->cwd))
+    if(!strlen(proc->cwd)) {
+        LOG("%ld cwd is empty\n", proc->pid);
         return 0;
+    }
     fprintf(stdout, "%s\n", proc->cwd);
 #endif
     return 1;
