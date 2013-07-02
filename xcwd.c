@@ -1,4 +1,4 @@
-/* This is fcwd written by Adrien Schildknecht (c) 2013
+/* This is xcwd written by Adrien Schildknecht (c) 2013
  * Email: adrien+dev@schischi.me
  * Feel free to copy and redistribute in terms of the
  * BSD license
@@ -8,12 +8,21 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-#include <unistd.h>
-#include <glob.h>
-#include <sys/stat.h>
 #include <X11/Xlib.h>
 
-#define DEBUG 0
+#ifdef LINUX
+# include <sys/stat.h>
+# include <glob.h>
+# include <unistd.h>
+#endif
+
+#ifdef BSD
+# include <sys/sysctl.h>
+# include <sys/user.h>
+# include <libutil.h>
+#endif
+
+#define DEBUG 1
 
 #define XA_STRING   (XInternAtom(dpy, "STRING", 0))
 #define XA_CARDINAL (XInternAtom(dpy, "CARDINAL", 0))
@@ -30,6 +39,9 @@ struct processes_s {
         long pid;
         long ppid;
         char name[32];
+#ifdef BSD
+        char cwd[MAXPATHLEN];
+#endif
     } *ps;
     size_t n;
 };
@@ -139,9 +151,10 @@ static void freeProcesses(processes_t p)
 
 static processes_t getProcesses(void)
 {
+    processes_t p = NULL;
+#ifdef LINUX
     glob_t globbuf;
     unsigned int i, j;
-    processes_t p;
 
     glob("/proc/[0-9]*", GLOB_NOSORT, NULL, &globbuf);
     p = malloc(sizeof(struct processes_s));
@@ -159,7 +172,7 @@ static processes_t getProcesses(void)
         if (tn == NULL)
             continue;
         if(fscanf(tn, "%ld (%32[^)] %*3c %ld", &p->ps[j].pid,
-                p->ps[j].name, &p->ps[j].ppid) != 3)
+                    p->ps[j].name, &p->ps[j].ppid) != 3)
             return NULL;
         LOG("\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[j].name, p->ps[j].pid,
                 p->ps[j].ppid);
@@ -168,16 +181,53 @@ static processes_t getProcesses(void)
     }
     p->n = j;
     globfree(&globbuf);
+#endif
+#ifdef BSD
+    unsigned int count;
+    p = malloc(sizeof(struct processes_s));
+    struct kinfo_proc *kp;
+    size_t len = 0;
+    int name[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC, 0 };
+    int error;
+    error = sysctl(name, 4, NULL, &len, NULL, 0);
+    kp = malloc(len);
+    error = sysctl(name, 4, kp, &len, NULL, 0);
+    count = len / sizeof(*kp);
+    p->ps = malloc(sizeof(struct proc_s) * count);
+    p->n = count;
+
+    unsigned int i;
+    for(i = 0; i < count; ++i) {
+        struct kinfo_file *files, *kif;
+        int cnt, j;
+        if(kp[i].ki_fd == NULL)
+            continue;
+        files = kinfo_getfile(kp[i].ki_pid, &cnt);
+        for(j = 0; j < cnt; ++j) {
+            kif = &files[j];
+            if(kif->kf_fd != KF_FD_TYPE_CWD)
+                continue;
+            p->ps[i].pid = kp[i].ki_pid;
+            p->ps[i].ppid = kp[i].ki_ppid;
+            strncpy(p->ps[i].name, kp[i].ki_tdname, 32);
+            strncpy(p->ps[i].cwd, kif->kf_path, MAXPATHLEN);
+            //fprintf(stderr, "%s (%ld - %ld) - %s\n",p->ps[i].name,  p->ps[i].pid,
+            //        p->ps[i].ppid, p->ps[i].cwd);
+        }
+
+    }
+#endif
     return p;
 }
 
-static int readPath(long pid)
+static int readPath(struct proc_s *proc)
 {
+#ifdef LINUX
     char buf[255];
     char path[64];
     ssize_t len;
 
-    snprintf(path, sizeof(path), "/proc/%ld/cwd", pid);
+    snprintf(path, sizeof(path), "/proc/%ld/cwd", proc->pid);
     if ((len = readlink(path, buf, 255)) != -1)
         buf[len] = '\0';
     if(len <= 0) {
@@ -186,6 +236,12 @@ static int readPath(long pid)
     }
     LOG("Read %s\n", path);
     fprintf(stdout, "%s\n", buf);
+#endif
+#ifdef BSD
+    if(!strlen(proc->cwd))
+        return 0;
+    fprintf(stdout, "%s\n", proc->cwd);
+#endif
     return 1;
 }
 
@@ -204,15 +260,15 @@ static void cwdOfDeepestChild(processes_t p, long pid)
     } while(res);
 
     if(!lastRes) {
-        readPath(pid);
+        readPath(&key);
         return;
     }
 
     for(i = 0; lastRes != p->ps && (lastRes - i)->ppid == lastRes->ppid; ++i)
-        if(readPath((lastRes - i)->pid))
+        if(readPath((lastRes - i)))
             return;
     for(i = 1; lastRes != p->ps + p->n && (lastRes + i)->ppid == lastRes->ppid; ++i)
-        if(readPath((lastRes + i)->pid))
+        if(readPath((lastRes + i)))
             return;
 }
 

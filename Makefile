@@ -11,8 +11,8 @@ ifeq ($(UNAME), Linux)
     CFLAGS += -DLINUX
 else
     ifeq ($(UNAME), FreeBSD)
-        CFLAGS += -I/usr/local/include/ -DFREEBSD
-        LDFLAGS += -L/usr/local/lib -lprocstat
+        CFLAGS += -I/usr/local/include/ -DBSD
+        LDFLAGS += -L/usr/local/lib -lutil
     else
         $(error Operating System not supported.)
     endif
