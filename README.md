@@ -36,3 +36,11 @@ Simply invoke the 'xcwd' command.
 
 You probably want to use it this way:
     ``urxvt -cd "`xcwd`" ``
+
+i3 Configuration
+----------------
+
+You can add a key binding like this one:
+
+    bindsym $mod+Shift+Return exec xcwd | xargs urxvt -cd
+
