@@ -61,15 +61,15 @@ static Window focusedWindow()
 {
     Atom type;
     Window focuswin, root, *children;
-    int format, status, focusrevert;
+    int format, status;
     unsigned long nitems, after;
-    unsigned char *data;
     unsigned int nchildren;
+    unsigned char *data;
 
     dpy = XOpenDisplay (NULL);
     if (!dpy)
-        exit (1);
-    XGetInputFocus (dpy, &focuswin, &focusrevert);
+        exit(EXIT_FAILURE);
+    XGetInputFocus (dpy, &focuswin, (int[1]){});
     root = XDefaultRootWindow(dpy);
     if(root == focuswin)
         return None;
@@ -291,17 +291,17 @@ int main(int argc, const char *argv[])
 
     processes_t p;
     long pid;
+    int ret = EXIT_SUCCESS;
     Window w = focusedWindow();
     if (w == None)
         return getHomeDirectory();
 
     pid = windowPid(w);
     p = getProcesses();
-    if(p == NULL)
+    if(!p)
         return getHomeDirectory();
-    if (pid != -1) {
+    if(pid != -1)
         qsort(p->ps, p->n, sizeof(struct proc_s), ppidCmp);
-    }
     else {
         long unsigned int size;
         unsigned int i;
@@ -322,15 +322,12 @@ int main(int argc, const char *argv[])
             pid = res->pid;
             LOG("Found %s (%ld)\n", res->name, res->pid);
         }
-        if (size != 0)
+        if (size)
             free(strings);
     }
-    if (pid == -1 || !cwdOfDeepestChild(p, pid)) {
-        LOG("%s", "getenv $HOME...\n");
-        fprintf(stdout, "%s\n", getenv("HOME"));
-    }
+    if (pid == -1 || !cwdOfDeepestChild(p, pid))
+        ret = getHomeDirectory();
     freeProcesses(p);
-
-    return EXIT_SUCCESS;
+    return ret;
 }
 
