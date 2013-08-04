@@ -237,6 +237,8 @@ static int readPath(struct proc_s *proc)
         return 0;
     }
     LOG("Read %s\n", path);
+    if(access(buf, F_OK))
+        return 0;
     fprintf(stdout, "%s\n", buf);
 #endif
 #ifdef BSD
@@ -244,6 +246,8 @@ static int readPath(struct proc_s *proc)
         LOG("%ld cwd is empty\n", proc->pid);
         return 0;
     }
+    if(access(proc->cwd, F_OK))
+        return 0;
     fprintf(stdout, "%s\n", proc->cwd);
 #endif
     return 1;
