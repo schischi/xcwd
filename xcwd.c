@@ -8,12 +8,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+#include <unistd.h>
 #include <X11/Xlib.h>
 
 #ifdef LINUX
 # include <sys/stat.h>
 # include <glob.h>
-# include <unistd.h>
 #endif
 
 #ifdef BSD
@@ -189,10 +189,9 @@ static processes_t getProcesses(void)
     struct kinfo_proc *kp;
     size_t len = 0;
     int name[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC, 0 };
-    int error;
-    error = sysctl(name, 4, NULL, &len, NULL, 0);
+    sysctl(name, 4, NULL, &len, NULL, 0);
     kp = malloc(len);
-    error = sysctl(name, 4, kp, &len, NULL, 0);
+    sysctl(name, 4, kp, &len, NULL, 0);
     count = len / sizeof(*kp);
     p->ps = calloc(count, sizeof(struct proc_s));
     p->n = count;
