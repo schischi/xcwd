@@ -155,7 +155,8 @@ static processes_t getProcesses(void)
     processes_t p = NULL;
 #ifdef LINUX
     glob_t globbuf;
-    unsigned int i, j;
+    unsigned int i, j, k;
+    char line[201] = {0};
 
     glob("/proc/[0-9]*", GLOB_NOSORT, NULL, &globbuf);
     p = malloc(sizeof(struct processes_s));
@@ -172,9 +173,12 @@ static processes_t getProcesses(void)
         tn = fopen(name, "r");
         if (tn == NULL)
             continue;
-        if(fscanf(tn, "%ld (%32[^)] %*3c %ld", &p->ps[j].pid,
-                    p->ps[j].name, &p->ps[j].ppid) != 3)
-            return NULL;
+        fread(line, 200, 1, tn);
+        p->ps[j].pid = atoi(strtok(line, " "));
+        k = snprintf(p->ps[j].name, 32, "%s", strtok(NULL, " ") + 1);
+        p->ps[j].name[k - 1] = 0;
+        strtok(NULL, " "); // discard process state
+        p->ps[j].ppid = atoi(strtok(NULL, " "));
         LOG("\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[j].name, p->ps[j].pid,
                 p->ps[j].ppid);
         fclose(tn);
