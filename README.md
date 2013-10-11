@@ -42,5 +42,11 @@ i3 Configuration
 
 You can add a key binding like this one:
 
-    bindsym $mod+Shift+Return exec xcwd | xargs urxvt -cd
+    printf '%s\n' '#!/bin/bash' 'urxvt -cd "$(xcwd)"' > ~/bin/uxcwd 
+    chmod a+x ~/bin/uxcwd
+    
+    Then, in i3config:
+    bindsym $mod+Shift+Return exec ~/bin/uxcwd 
+
+The wrapper script is used to handle paths with spaces present in them.
 
