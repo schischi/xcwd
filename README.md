@@ -42,5 +42,8 @@ i3 Configuration
 
 You can add a key binding like this one:
 
-    bindsym $mod+Shift+Return exec xcwd | xargs urxvt -cd
+ bindsym $mod+Return exec bash -c 'exec urxvt -cd "$(xcwd)"'
+ 
+We use bash -c to work with directories which contain spaces.
+
 
