@@ -7,28 +7,37 @@ The main goal is to launch applications directly into the same directory
 as the focused applications. This is especially useful if you want to open
 a new terminal for debugging or compiling purpose.
 
-How it works
-------------
-Since there is no proper options to get the pid of the currently focused
-windows, xcwd first try to read the `_NET_WM_PID` property.
-If it fails, it reads the `_NET_WM_CLASS` and compares it to the name of
-all the running processes (it's kind of `pidof name`).
-
-When xcwd has got the PID, it search the deepest child he has, thus avoiding
-getting the working directory of the terminal emulator instead of the shell.
-
-Finally it prints the content of `/proc/pid/cwd` on the standard output.  If
-xcwd was unable to find the PID, it prints the content of the `HOME` variable.
-
 Disclaimer
 ----------
-This script can't retrieve the working directory of a shell in tmux, screen
-or in an instance of urxvtc.
+This script *can't* retrieve the working directory of a "single instance
+application" nor terminal multiplexer, e.g. :
+  - tmux, screen
+  - lilyterm
+  - konsole
+  - urxvt*c*
+  - applications with tabs
+
+The application works well with the following terminals :
+  - urxvt
+  - xterm
+  - gnome terminal
+
+How it works
+------------
+  - Retrieve the focused window
+  - Read its attributes to get the PID. If `_NET_WM_PID` is set, xcwd just
+    read the value. Otherwise it reads the `_NET_WM_CLASS` and compares it to
+    the name of all the running processes
+  - Search for the deepest child of the selected PID (to avoid getting the
+    working directory of the terminal instead of the shell)
+  - Print the current working directory
+
+If one of those steps fail, xcwd print the content of the `HOME` variable.
 
 Requirements
 ------------
-- Linux
-- libX11-dev
+  - Linux or FreeBSD
+  - libX11-dev
 
 Running xwcd
 ------------
@@ -36,11 +45,9 @@ Simply invoke the 'xcwd' command.
 
 You probably want to use it this way:
     ``urxvt -cd "`xcwd`" ``
+    ``xterm -e "cd `xcwd` && /bin/zsh"``
 
 i3 Configuration
 ----------------
-
-You can add a key binding like this one:
-
-    bindsym $mod+Shift+Return exec xcwd | xargs urxvt -cd
-
+bindsym $mod+Shift+Return exec ``urxvt -cd "`xcwd`" ``
+bindsym $mod+Shift+Return exec ``xterm -e "cd `xcwd` && /bin/zsh"``
