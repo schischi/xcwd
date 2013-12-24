@@ -9,12 +9,12 @@ a new terminal for debugging or compiling purpose.
 
 Disclaimer
 ----------
-This script *can't* retrieve the working directory of a "single instance
+This script **can't** retrieve the working directory of a "single instance
 application" nor terminal multiplexer, e.g. :
   - tmux, screen
   - lilyterm
   - konsole
-  - urxvt*c*
+  - urxvtc with urxvtd
   - applications with tabs
 
 The application works well with the following terminals :
