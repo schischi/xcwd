@@ -1,4 +1,4 @@
-/* This is xcwd written by Adrien Schildknecht (c) 2013
+/* This is xcwd written by Adrien Schildknecht (c) 2013-2014
  * Email: adrien+dev@schischi.me
  * Feel free to copy and redistribute in terms of the
  * BSD license
@@ -22,19 +22,21 @@
 # include <libutil.h>
 #endif
 
-#define DEBUG 0
+//#define DEBUG
 
 #define XA_STRING   (XInternAtom(dpy, "STRING", 0))
 #define XA_CARDINAL (XInternAtom(dpy, "CARDINAL", 0))
 #define XA_WM_STATE (XInternAtom(dpy, "WM_STATE", 0))
 
-#define LOG(fmt, ...) \
-    do { if (DEBUG) fprintf(stderr, fmt, __VA_ARGS__); } while (0)
+#ifdef DEBUG
+ #define LOG(fmt, ...) fprintf(stderr, fmt, __VA_ARGS__)
+#else
+ #define LOG(fmt, ...) do { } while (0)
+#endif
 
 Display *dpy;
 
-typedef struct processes_s *processes_t;
-struct processes_s {
+struct proc_list {
     struct proc_s {
         long pid;
         long ppid;
@@ -46,18 +48,18 @@ struct processes_s {
     size_t n;
 };
 
-int nameCmp(const void *p1, const void *p2)
+static int process_name_cmp(const void *p1, const void *p2)
 {
     return strcasecmp(((struct proc_s *)p1)->name,
             ((struct proc_s *)p2)->name);
 }
 
-int ppidCmp(const void *p1, const void *p2)
+static int process_ppid_cmp(const void *p1, const void *p2)
 {
     return ((struct proc_s *)p1)->ppid - ((struct proc_s *)p2)->ppid;
 }
 
-static Window focusedWindow()
+static Window focused_window(void)
 {
     Atom type;
     Window focuswin, root, *children;
@@ -93,7 +95,7 @@ static Window focusedWindow()
     return 0;
 }
 
-static long windowPid(Window focuswin)
+static long pid_of_window(Window win)
 {
     Atom nameAtom = XInternAtom(dpy, "_NET_WM_PID", 1);
     Atom type;
@@ -102,7 +104,7 @@ static long windowPid(Window focuswin)
     unsigned long nitems, after;
     unsigned char *data;
 
-    status = XGetWindowProperty(dpy, focuswin, nameAtom, 0, 1024, 0,
+    status = XGetWindowProperty(dpy, win, nameAtom, 0, 1024, 0,
             XA_CARDINAL, &type, &format, &nitems, &after, &data);
     if (status == Success && data) {
         pid = *((long*)data);
@@ -114,7 +116,7 @@ static long windowPid(Window focuswin)
     return pid;
 }
 
-static char* windowStrings(Window focuswin, long unsigned int *size, char* hint)
+static char* window_strings(Window win, long unsigned int *size, char *hint)
 {
     Atom nameAtom = XInternAtom(dpy, hint, 1);
     Atom type;
@@ -124,7 +126,7 @@ static char* windowStrings(Window focuswin, long unsigned int *size, char* hint)
     unsigned char *data = 0;
     char *ret = NULL;
 
-    if (XGetWindowProperty(dpy, focuswin, nameAtom, 0, 1024, 0, AnyPropertyType,
+    if (XGetWindowProperty(dpy, win, nameAtom, 0, 1024, 0, AnyPropertyType,
                 &type, &format, size, &after, &data) == Success) {
         if (data) {
             if (type == XA_STRING) {
@@ -144,22 +146,22 @@ static char* windowStrings(Window focuswin, long unsigned int *size, char* hint)
     return ret;
 }
 
-static void freeProcesses(processes_t p)
+static void processes_free(struct proc_list * p)
 {
     free(p->ps);
     free(p);
 }
 
-static processes_t getProcesses(void)
+static struct proc_list * processes_list(void)
 {
-    processes_t p = NULL;
+    struct proc_list * p = NULL;
 #ifdef LINUX
     glob_t globbuf;
     unsigned int i, j, k;
     char line[201] = {0};
 
     glob("/proc/[0-9]*", GLOB_NOSORT, NULL, &globbuf);
-    p = malloc(sizeof(struct processes_s));
+    p = malloc(sizeof(struct proc_list));
     p->ps = malloc(globbuf.gl_pathc * sizeof(struct proc_s));
 
     LOG("Found %zu processes\n", globbuf.gl_pathc);
@@ -173,7 +175,8 @@ static processes_t getProcesses(void)
         tn = fopen(name, "r");
         if (tn == NULL)
             continue;
-        fread(line, 200, 1, tn);
+        if (fread(line, 200, 1, tn) == 0)
+            continue;
         p->ps[j].pid = atoi(strtok(line, " "));
         k = snprintf(p->ps[j].name, 32, "%s", strtok(NULL, " ") + 1);
         p->ps[j].name[k - 1] = 0;
@@ -189,7 +192,7 @@ static processes_t getProcesses(void)
 #endif
 #ifdef BSD
     unsigned int count;
-    p = malloc(sizeof(struct processes_s));
+    p = malloc(sizeof(struct proc_list));
     struct kinfo_proc *kp;
     size_t len = 0;
     int name[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC, 0 };
@@ -225,7 +228,7 @@ static processes_t getProcesses(void)
     return p;
 }
 
-static int readPath(struct proc_s *proc)
+static int read_process_path(struct proc_s *proc)
 {
 #ifdef LINUX
     char buf[255];
@@ -256,35 +259,40 @@ static int readPath(struct proc_s *proc)
     return 1;
 }
 
-static int cwdOfDeepestChild(processes_t p, long pid)
+static int child_cwd(struct proc_list * p, struct proc_s *key)
 {
     int i;
-    struct proc_s key = { .pid = pid, .ppid = pid},
-                  *res = NULL, *lastRes = NULL;
+    struct proc_s *res =  (struct proc_s *)bsearch(key, p->ps, p->n,
+                sizeof(struct proc_s), process_ppid_cmp);
+    struct proc_s new_key = { .pid = key->ppid };
 
-    do {
-        if(res) {
-            lastRes = res;
-            key.ppid = res->pid;
-        }
-        res = (struct proc_s *)bsearch(&key, p->ps, p->n,
-                sizeof(struct proc_s), ppidCmp);
-    } while(res);
-
-    if(!lastRes) {
-        return readPath(&key);
+    if (res == NULL) {
+        LOG("--> %ld pid\n", key->pid);
+        return read_process_path(key);
     }
-
-    for(i = 0; lastRes != p->ps && (lastRes - i)->ppid == lastRes->ppid; ++i)
-        if(readPath((lastRes - i)))
+    for(i = 0; res != p->ps && (res - i)->ppid == res->ppid; ++i) {
+        new_key.ppid = (res - i)->pid;
+        LOG("--> %ld ppid\n", new_key.ppid);
+        if(child_cwd(p, &new_key))
             return 1;
-    for(i = 1; lastRes != p->ps + p->n && (lastRes + i)->ppid == lastRes->ppid; ++i)
-        if(readPath((lastRes + i)))
+    }
+    for(i = 1; res != p->ps + p->n && (res + i)->ppid == res->ppid; ++i) {
+        new_key.ppid = (res + i)->pid;
+        LOG("--> %ld ppid\n", new_key.ppid);
+        if(child_cwd(p, &new_key))
             return 1;
-    return 0;
+    }
+    return read_process_path(key);
 }
 
-int getHomeDirectory()
+static int deepest_child_cwd(struct proc_list * p, long pid)
+{
+    struct proc_s key = { .pid = pid, .ppid = pid};
+
+    return child_cwd(p, &key);
+}
+
+int get_home_dir(void)
 {
     LOG("%s", "getenv $HOME...\n");
     fprintf(stdout, "%s\n", getenv("HOME"));
@@ -296,32 +304,32 @@ int main(int argc, const char *argv[])
     (void)argc;
     (void)argv;
 
-    processes_t p;
+    struct proc_list * p;
     long pid;
     int ret = EXIT_SUCCESS;
-    Window w = focusedWindow();
+    Window w = focused_window();
     if (w == None)
-        return getHomeDirectory();
+        return get_home_dir();
 
-    pid = windowPid(w);
-    p = getProcesses();
+    pid = pid_of_window(w);
+    p = processes_list();
     if(!p)
-        return getHomeDirectory();
+        return get_home_dir();
     if(pid != -1)
-        qsort(p->ps, p->n, sizeof(struct proc_s), ppidCmp);
+        qsort(p->ps, p->n, sizeof(struct proc_s), process_ppid_cmp);
     else {
         long unsigned int size;
         unsigned int i;
         char* strings;
         struct proc_s *res = NULL, key;
 
-        qsort(p->ps, p->n, sizeof(struct proc_s), nameCmp);
-        strings = windowStrings(w, &size, "WM_CLASS");
+        qsort(p->ps, p->n, sizeof(struct proc_s), process_name_cmp);
+        strings = window_strings(w, &size, "WM_CLASS");
         for(i = 0; i < size; i += strlen(strings + i) + 1) {
             LOG("pidof %s\n", strings + i);
             strcpy(key.name, strings + i);
             res = (struct proc_s *)bsearch(&key, p->ps, p->n,
-                    sizeof(struct proc_s), nameCmp);
+                    sizeof(struct proc_s), process_name_cmp);
             if(res)
                 break;
         }
@@ -332,9 +340,9 @@ int main(int argc, const char *argv[])
         if (size)
             free(strings);
     }
-    if (pid == -1 || !cwdOfDeepestChild(p, pid))
-        ret = getHomeDirectory();
-    freeProcesses(p);
+    if (pid == -1 || !deepest_child_cwd(p, pid))
+        ret = get_home_dir();
+    processes_free(p);
     return ret;
 }
 
