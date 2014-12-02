@@ -21,6 +21,7 @@ The application works well with the following terminals :
   - urxvt
   - xterm
   - gnome terminal
+  - terminology
 
 How it works
 ------------
