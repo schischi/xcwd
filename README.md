@@ -40,15 +40,21 @@ Requirements
   - Linux or FreeBSD
   - libX11-dev
 
+Installation
+------------
+* Clone this repository or [download as ZIP](https://github.com/schischi/xcwd/archive/master.zip)
+* `make`
+* `make install`
+
 Running xwcd
 ------------
 Simply invoke the 'xcwd' command.
 
 You probably want to use it this way:
-    ``urxvt -cd "`xcwd`" ``
-    ``xterm -e "cd `xcwd` && /bin/zsh"``
+* ``urxvt -cd "`xcwd`" ``
+* ``xterm -e "cd `xcwd` && /bin/zsh"``
 
 i3 Configuration
 ----------------
-bindsym $mod+Shift+Return exec ``urxvt -cd "`xcwd`" ``
-bindsym $mod+Shift+Return exec ``xterm -e "cd `xcwd` && /bin/zsh"``
+* bindsym $mod+Shift+Return exec ``urxvt -cd "`xcwd`" ``
+* bindsym $mod+Shift+Return exec ``xterm -e "cd `xcwd` && /bin/zsh"``
