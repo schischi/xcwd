@@ -3,7 +3,7 @@ CC=gcc
 CFLAGS=-Wall -Wextra -std=gnu99 -O2
 LDFLAGS=-lX11
 EXE="xcwd"
-prefix=/usr/
+prefix=/usr
 UNAME:=$(shell uname)
 O=${CFILES:.c=.o}
 
