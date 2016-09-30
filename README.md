@@ -53,8 +53,10 @@ Simply invoke the 'xcwd' command.
 You probably want to use it this way:
 * ``urxvt -cd "`xcwd`" ``
 * ``xterm -e "cd `xcwd` && /bin/zsh"``
+* ``pcmanfm "`xcwd`" ``
 
 i3 Configuration
 ----------------
 * bindsym $mod+Shift+Return exec ``urxvt -cd "`xcwd`" ``
 * bindsym $mod+Shift+Return exec ``xterm -e "cd `xcwd` && /bin/zsh"``
+* bindsym $mod+p            exec ``pcmanfm "`xcwd`"``
