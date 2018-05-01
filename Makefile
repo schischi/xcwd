@@ -2,10 +2,13 @@ CFILES=xcwd.c
 CC=gcc
 CFLAGS=-Wall -Wextra -std=gnu99 -O2
 LDFLAGS=-lX11
-EXE="xcwd"
+EXE=xcwd
 prefix=/usr
 UNAME:=$(shell uname)
 O=${CFILES:.c=.o}
+
+.PHONY: all clean distclean install
+.SUFFIXES: .c .o
 
 ifeq ($(UNAME), Linux)
     CFLAGS += -DLINUX
@@ -18,12 +21,7 @@ else
     endif
 endif
 
-${EXE}: clean ${O}
-	${CC} -o $@ ${O} ${CFLAGS} ${LDFLAGS}
-
-.SUFFIXES: .c .o
-.c.o:
-	${CC} -c $< ${CFLAGS}
+all: ${EXE}
 
 clean:
 	rm -vf *.o
@@ -33,4 +31,12 @@ distclean: clean
 
 install: ${EXE}
 	install -m 0755 ${EXE} $(prefix)/bin
+
+
+${EXE}: ${O}
+	${CC} -o $@ ${O} ${CFLAGS} ${LDFLAGS}
+
+
+.c.o:
+	${CC} -c $< ${CFLAGS}
 
