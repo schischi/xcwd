@@ -17,9 +17,12 @@
 # include <glob.h>
 #endif
 
-#ifdef BSD
+#if defined(FREEBSD) || defined(OPENBSD)
 # include <sys/sysctl.h>
 # include <sys/user.h>
+#endif
+#ifdef FREEBSD
+# include <libutil.h>
 #endif
 
 #define DEBUG 0
@@ -39,7 +42,7 @@ struct processes_s {
         long pid;
         long ppid;
         char name[32];
-#ifdef BSD
+#if defined(FREEBSD) || defined(OPENBSD)
         char cwd[PATH_MAX];
 #endif
     } *ps;
@@ -187,7 +190,42 @@ static processes_t getProcesses(void)
     p->n = j;
     globfree(&globbuf);
 #endif
-#ifdef BSD
+#ifdef FREEBSD
+    unsigned int count;
+    p = malloc(sizeof(struct processes_s));
+    struct kinfo_proc *kp;
+    size_t len = 0;
+    int name[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC, 0 };
+    sysctl(name, 4, NULL, &len, NULL, 0);
+    kp = malloc(len);
+    sysctl(name, 4, kp, &len, NULL, 0);
+    count = len / sizeof(*kp);
+    p->ps = calloc(count, sizeof(struct proc_s));
+    p->n = count;
+
+    unsigned int i;
+    for(i = 0; i < count; ++i) {
+        struct kinfo_file *files, *kif;
+        int cnt, j;
+        if(kp[i].ki_fd == NULL || kp[i].ki_pid == 0)
+            continue;
+        files = kinfo_getfile(kp[i].ki_pid, &cnt);
+        for(j = 0; j < cnt; ++j) {
+            kif = &files[j];
+            if(kif->kf_fd != KF_FD_TYPE_CWD)
+                continue;
+            p->ps[i].pid = kp[i].ki_pid;
+            p->ps[i].ppid = kp[i].ki_ppid;
+            strncpy(p->ps[i].name, kp[i].ki_tdname, 32);
+            strncpy(p->ps[i].cwd, kif->kf_path, MAXPATHLEN);
+            LOG("\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[i].name, p->ps[i].pid,
+                p->ps[i].ppid);
+        }
+
+    }
+    free(kp);
+#endif
+#ifdef OPENBSD
     unsigned int count;
     p = malloc(sizeof(struct processes_s));
     struct kinfo_proc *kp;
@@ -240,7 +278,7 @@ static int readPath(struct proc_s *proc)
         return 0;
     fprintf(stdout, "%s\n", buf);
 #endif
-#ifdef BSD
+#if defined(FREEBSD) || defined(OPENBSD)
     if(!strlen(proc->cwd)) {
         LOG("%ld cwd is empty\n", proc->pid);
         return 0;
