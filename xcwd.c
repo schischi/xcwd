@@ -4,6 +4,7 @@
  * BSD license
  */
 
+#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -19,7 +20,6 @@
 #ifdef BSD
 # include <sys/sysctl.h>
 # include <sys/user.h>
-# include <libutil.h>
 #endif
 
 #define DEBUG 0
@@ -40,7 +40,7 @@ struct processes_s {
         long ppid;
         char name[32];
 #ifdef BSD
-        char cwd[MAXPATHLEN];
+        char cwd[PATH_MAX];
 #endif
     } *ps;
     size_t n;
@@ -192,33 +192,29 @@ static processes_t getProcesses(void)
     p = malloc(sizeof(struct processes_s));
     struct kinfo_proc *kp;
     size_t len = 0;
-    int name[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC, 0 };
-    sysctl(name, 4, NULL, &len, NULL, 0);
+    int name[6] = { CTL_KERN, KERN_PROC, KERN_PROC_UID, getuid(), sizeof(struct kinfo_proc), 0 };
+    sysctl(name, 6, NULL, &len, NULL, 0);
+    len += len/8; // some headroom
     kp = malloc(len);
-    sysctl(name, 4, kp, &len, NULL, 0);
+    name[5] = len / sizeof(struct kinfo_proc);
+    sysctl(name, 6, kp, &len, NULL, 0);
     count = len / sizeof(*kp);
     p->ps = calloc(count, sizeof(struct proc_s));
     p->n = count;
 
     unsigned int i;
     for(i = 0; i < count; ++i) {
-        struct kinfo_file *files, *kif;
-        int cnt, j;
-        if(kp[i].ki_fd == NULL || kp[i].ki_pid == 0)
-            continue;
-        files = kinfo_getfile(kp[i].ki_pid, &cnt);
-        for(j = 0; j < cnt; ++j) {
-            kif = &files[j];
-            if(kif->kf_fd != KF_FD_TYPE_CWD)
-                continue;
-            p->ps[i].pid = kp[i].ki_pid;
-            p->ps[i].ppid = kp[i].ki_ppid;
-            strncpy(p->ps[i].name, kp[i].ki_tdname, 32);
-            strncpy(p->ps[i].cwd, kif->kf_path, MAXPATHLEN);
-            LOG("\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[i].name, p->ps[i].pid,
+        struct kinfo_proc *kip = &kp[i];
+        p->ps[i].pid = kip->p_pid;
+        p->ps[i].ppid = kip->p_ppid;
+        strlcpy(p->ps[i].name, kip->p_comm, sizeof(p->ps[i].name));
+        char cwd[PATH_MAX];
+        int name[3] = { CTL_KERN, KERN_PROC_CWD, kip->p_pid };
+        len = sizeof(cwd);
+        if (sysctl(name, 3, cwd, &len, NULL, 0) == 0)
+            strlcpy(p->ps[i].cwd, cwd, sizeof(p->ps[i].cwd));
+        LOG("\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[i].name, p->ps[i].pid,
                 p->ps[i].ppid);
-        }
-
     }
     free(kp);
 #endif

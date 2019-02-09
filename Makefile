@@ -1,7 +1,7 @@
 CFILES=xcwd.c
-CC=gcc
-CFLAGS=-Wall -Wextra -std=gnu99 -O2
-LDFLAGS=-lX11
+CC=cc
+CFLAGS=-Wall -Wextra -O2
+LDFLAGS=-L/usr/X11R6/lib -lX11
 EXE=xcwd
 prefix=/usr
 UNAME:=$(shell uname)
@@ -13,9 +13,9 @@ O=${CFILES:.c=.o}
 ifeq ($(UNAME), Linux)
     CFLAGS += -DLINUX
 else
-    ifeq ($(UNAME), FreeBSD)
-        CFLAGS += -I/usr/local/include/ -DBSD
-        LDFLAGS += -L/usr/local/lib -lutil
+    ifeq ($(UNAME), OpenBSD)
+        CFLAGS += -DBSD -I /usr/X11R6/include
+        #LDFLAGS += -lutil
     else
         $(error Operating System not supported.)
     endif
