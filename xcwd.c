@@ -289,7 +289,8 @@ static int readPath(struct proc_s *proc)
     if (sysctl(name, 3, cwd, &len, NULL, 0) == 0) {
         if(access(cwd, F_OK))
              return 0;
-    }
+    } else
+	return 0;
     fprintf(stdout, "%s\n", cwd);
 #endif
     return 1;
