@@ -42,7 +42,7 @@ struct processes_s {
         long pid;
         long ppid;
         char name[32];
-#if defined(FREEBSD) || defined(OPENBSD)
+#if defined(FREEBSD)
         char cwd[PATH_MAX];
 #endif
     } *ps;
@@ -246,11 +246,6 @@ static processes_t getProcesses(void)
         p->ps[i].pid = kip->p_pid;
         p->ps[i].ppid = kip->p_ppid;
         strlcpy(p->ps[i].name, kip->p_comm, sizeof(p->ps[i].name));
-        char cwd[PATH_MAX];
-        int name[3] = { CTL_KERN, KERN_PROC_CWD, kip->p_pid };
-        len = sizeof(cwd);
-        if (sysctl(name, 3, cwd, &len, NULL, 0) == 0)
-            strlcpy(p->ps[i].cwd, cwd, sizeof(p->ps[i].cwd));
         LOG("\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[i].name, p->ps[i].pid,
                 p->ps[i].ppid);
     }
@@ -278,7 +273,7 @@ static int readPath(struct proc_s *proc)
         return 0;
     fprintf(stdout, "%s\n", buf);
 #endif
-#if defined(FREEBSD) || defined(OPENBSD)
+#if defined(FREEBSD)
     if(!strlen(proc->cwd)) {
         LOG("%ld cwd is empty\n", proc->pid);
         return 0;
@@ -286,6 +281,16 @@ static int readPath(struct proc_s *proc)
     if(access(proc->cwd, F_OK))
         return 0;
     fprintf(stdout, "%s\n", proc->cwd);
+#endif
+#if defined(OPENBSD)
+    char cwd[PATH_MAX];
+    int name[3] = { CTL_KERN, KERN_PROC_CWD, proc->pid };
+    size_t len = sizeof(cwd);
+    if (sysctl(name, 3, cwd, &len, NULL, 0) == 0) {
+        if(access(cwd, F_OK))
+             return 0;
+    }
+    fprintf(stdout, "%s\n", cwd);
 #endif
     return 1;
 }
