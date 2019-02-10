@@ -1,6 +1,6 @@
 CFILES=xcwd.c
 CC=gcc
-CFLAGS=-Wall -Wextra -O2
+CFLAGS=-Wall -Wextra -std=gnu99 -O2
 LDFLAGS=-lX11
 EXE=xcwd
 prefix=/usr
