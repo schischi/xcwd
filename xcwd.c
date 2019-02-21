@@ -4,6 +4,7 @@
  * BSD license
  */
 
+#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -16,9 +17,11 @@
 # include <glob.h>
 #endif
 
-#ifdef BSD
+#if defined(FREEBSD) || defined(OPENBSD)
 # include <sys/sysctl.h>
 # include <sys/user.h>
+#endif
+#ifdef FREEBSD
 # include <libutil.h>
 #endif
 
@@ -39,8 +42,8 @@ struct processes_s {
         long pid;
         long ppid;
         char name[32];
-#ifdef BSD
-        char cwd[MAXPATHLEN];
+#if defined(FREEBSD)
+        char cwd[PATH_MAX];
 #endif
     } *ps;
     size_t n;
@@ -187,7 +190,7 @@ static processes_t getProcesses(void)
     p->n = j;
     globfree(&globbuf);
 #endif
-#ifdef BSD
+#ifdef FREEBSD
     unsigned int count;
     p = malloc(sizeof(struct processes_s));
     struct kinfo_proc *kp;
@@ -222,6 +225,32 @@ static processes_t getProcesses(void)
     }
     free(kp);
 #endif
+#ifdef OPENBSD
+    unsigned int count;
+    p = malloc(sizeof(struct processes_s));
+    struct kinfo_proc *kp;
+    size_t len = 0;
+    int name[6] = { CTL_KERN, KERN_PROC, KERN_PROC_UID, getuid(), sizeof(struct kinfo_proc), 0 };
+    sysctl(name, 6, NULL, &len, NULL, 0);
+    len += len/8; // some headroom
+    kp = malloc(len);
+    name[5] = len / sizeof(struct kinfo_proc);
+    sysctl(name, 6, kp, &len, NULL, 0);
+    count = len / sizeof(*kp);
+    p->ps = calloc(count, sizeof(struct proc_s));
+    p->n = count;
+
+    unsigned int i;
+    for(i = 0; i < count; ++i) {
+        struct kinfo_proc *kip = &kp[i];
+        p->ps[i].pid = kip->p_pid;
+        p->ps[i].ppid = kip->p_ppid;
+        strlcpy(p->ps[i].name, kip->p_comm, sizeof(p->ps[i].name));
+        LOG("\t%-20s\tpid=%6ld\tppid=%6ld\n", p->ps[i].name, p->ps[i].pid,
+                p->ps[i].ppid);
+    }
+    free(kp);
+#endif
     return p;
 }
 
@@ -244,7 +273,7 @@ static int readPath(struct proc_s *proc)
         return 0;
     fprintf(stdout, "%s\n", buf);
 #endif
-#ifdef BSD
+#if defined(FREEBSD)
     if(!strlen(proc->cwd)) {
         LOG("%ld cwd is empty\n", proc->pid);
         return 0;
@@ -252,6 +281,17 @@ static int readPath(struct proc_s *proc)
     if(access(proc->cwd, F_OK))
         return 0;
     fprintf(stdout, "%s\n", proc->cwd);
+#endif
+#if defined(OPENBSD)
+    char cwd[PATH_MAX];
+    int name[3] = { CTL_KERN, KERN_PROC_CWD, proc->pid };
+    size_t len = sizeof(cwd);
+    if (sysctl(name, 3, cwd, &len, NULL, 0) == 0) {
+        if(access(cwd, F_OK))
+             return 0;
+    } else
+	return 0;
+    fprintf(stdout, "%s\n", cwd);
 #endif
     return 1;
 }
