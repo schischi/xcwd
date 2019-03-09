@@ -40,7 +40,7 @@ If one of these steps fail, xcwd prints the content of the `$HOME` variable.
 
 Requirements
 ------------
-  - Linux or FreeBSD
+  - Linux, FreeBSD or OpenBSD
   - libX11-dev
 
 Installation
@@ -48,6 +48,7 @@ Installation
 * Clone this repository or [download as ZIP](https://github.com/schischi/xcwd/archive/master.zip)
 * `make`
 * `make install`
+Use `gmake` on OpenBSD.
 
 Running xwcd
 ------------
@@ -62,6 +63,6 @@ Examples:
 i3 Configuration
 ----------------
 * bindsym $mod+Shift+Return exec ``urxvt -cd "`xcwd`" ``
-* bindsym $mod+Shift+Return exec ``xterm -e "cd `xcwd` && $SHELL"``
+* bindsym $mod+Shift+Return exec ``cd "$(xcwd)" && exec xterm``
 * bindsym $mod+Shift+Return exec ``gnome-terminal --working-directory="`xcwd`"``
 * bindsym $mod+p            exec ``pcmanfm "`xcwd`"``
