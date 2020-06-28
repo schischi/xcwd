@@ -66,3 +66,11 @@ i3 Configuration
 * bindsym $mod+Shift+Return exec ``cd "$(xcwd)" && exec xterm``
 * bindsym $mod+Shift+Return exec ``gnome-terminal --working-directory="`xcwd`"``
 * bindsym $mod+p            exec ``pcmanfm "`xcwd`"``
+
+
+Awesome WM Configuration
+------------------------
+```lua
+awful.key({ modkey, "Shift" }, "Return", function () awful.util.spawn("sh -c 'termite -d \"$(xcwd)\"'") end,
+          {description = "open a terminal on current path", group = "launcher"}),
+```
