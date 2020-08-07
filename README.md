@@ -17,13 +17,13 @@ application" nor terminal multiplexer, e.g.:
   - tmux, screen
   - lilyterm
   - konsole
+  - gnome terminal
   - urxvtc with urxvtd
   - applications with tabs
 
 The application works with the following terminals:
   - urxvt
   - xterm
-  - gnome terminal
   - terminology
 
 How it works
